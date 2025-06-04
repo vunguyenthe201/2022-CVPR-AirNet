@@ -6,22 +6,33 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from utils.dataset_utils import TrainDataset
+from utils.dataset_utils import TrainDataset, MDDataset
 from net.model import AirNet
 
 from option import options as opt
+from option import opt_dict
 
 if __name__ == '__main__':
     torch.cuda.set_device(opt.cuda)
     subprocess.check_output(['mkdir', '-p', opt.ckpt_path])
+    
+    dataset_opt = opt_dict["datasets"]["train"]
 
-    trainset = TrainDataset(opt)
+    # trainset = TrainDataset(opt)
+    trainset = MDDataset(dataset_opt)
     trainloader = DataLoader(trainset, batch_size=opt.batch_size, pin_memory=True, shuffle=True,
                              drop_last=True, num_workers=opt.num_workers)
-
+    
     # Network Construction
     net = AirNet(opt).cuda()
     net.train()
+    
+    if opt.continue_ckpt is not None:
+        print(f"Loading checkpoint from {opt.continue_ckpt}")
+        if torch.cuda.is_available():
+            net.load_state_dict(torch.load(opt.continue_ckpt))
+        else:
+            net.load_state_dict(torch.load(opt.continue_ckpt, map_location='cpu'))
 
     # Optimizer and Loss
     optimizer = optim.Adam(net.parameters(), lr=opt.lr)
@@ -32,24 +43,34 @@ if __name__ == '__main__':
     print('Start training...')
     for epoch in range(opt.epochs):
         for ([clean_name, de_id], degrad_patch_1, degrad_patch_2, clean_patch_1, clean_patch_2) in tqdm(trainloader):
-            degrad_patch_1, degrad_patch_2 = degrad_patch_1.cuda(), degrad_patch_2.cuda()
-            clean_patch_1, clean_patch_2 = clean_patch_1.cuda(), clean_patch_2.cuda()
+            try:
+                if "error" in clean_name:
+                    print("Error in data loading, skipping this batch.")
+                    continue
+                
+                degrad_patch_1, degrad_patch_2 = degrad_patch_1.cuda(), degrad_patch_2.cuda()
+                clean_patch_1, clean_patch_2 = clean_patch_1.cuda(), clean_patch_2.cuda()
 
-            optimizer.zero_grad()
+                optimizer.zero_grad()
 
-            if epoch < opt.epochs_encoder:
-                _, output, target, _ = net.E(x_query=degrad_patch_1, x_key=degrad_patch_2)
-                contrast_loss = CE(output, target)
-                loss = contrast_loss
-            else:
-                restored, output, target = net(x_query=degrad_patch_1, x_key=degrad_patch_2)
-                contrast_loss = CE(output, target)
-                l1_loss = l1(restored, clean_patch_1)
-                loss = l1_loss + 0.1 * contrast_loss
+                if epoch < opt.epochs_encoder:
+                    _, output, target, _ = net.E(x_query=degrad_patch_1, x_key=degrad_patch_2)
+                    contrast_loss = CE(output, target)
+                    loss = contrast_loss
+                else:
+                    restored, output, target = net(x_query=degrad_patch_1, x_key=degrad_patch_2)
+                    contrast_loss = CE(output, target)
+                    l1_loss = l1(restored, clean_patch_1)
+                    loss = l1_loss + 0.1 * contrast_loss
 
-            # backward
-            loss.backward()
-            optimizer.step()
+                # backward
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+            except Exception as e:
+                print(f"Error during training: {e}")
+                optimizer.zero_grad()
+                continue
 
         if epoch < opt.epochs_encoder:
             print(
@@ -63,7 +84,7 @@ if __name__ == '__main__':
                 ), '\r', end='')
 
         GPUS = 1
-        if (epoch + 1) % 50 == 0:
+        if (epoch + 1) % 10 == 0:
             checkpoint = {
                 "net": net.state_dict(),
                 'optimizer': optimizer.state_dict(),

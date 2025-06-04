@@ -55,7 +55,9 @@ if __name__ == '__main__':
     with torch.no_grad():
         for ([clean_name], degrad_patch) in tqdm(testloader):
             degrad_patch = degrad_patch.cuda()
+            print(degrad_patch.shape)
 
             restored = net(x_query=degrad_patch, x_key=degrad_patch)
+            print(restored.shape)
 
             save_image_tensor(restored, opt.output_path + clean_name[0] + '.png')
