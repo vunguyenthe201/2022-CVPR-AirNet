@@ -214,7 +214,7 @@ import torch
 import torch.utils.data as data
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, InterpolationMode
 
-def clip_transform(np_image, resolution=224):
+def clip_transform(np_image, resolution=512):
     pil_image = Image.fromarray((np_image * 255).astype(np.uint8))
     return Compose([
         Resize(resolution, interpolation=InterpolationMode.BICUBIC),
@@ -339,7 +339,7 @@ class MDDataset(data.Dataset):
         self.distortion = {}
         for deg_type in opt["distortion"]:
             GT_paths = get_image_paths(
-                opt["data_type"], os.path.join(opt["dataroot"], deg_type, 'HQ')
+                opt["data_type"], os.path.join(opt["dataroot"], deg_type, 'GT')
             )  # GT list
             LR_paths = get_image_paths(
                 opt["data_type"], os.path.join(opt["dataroot"], deg_type, 'LQ')
@@ -427,6 +427,9 @@ class MDDataset(data.Dataset):
                 #     self.opt["use_rot"],
                 #     mode=self.opt["mode"],
                 # )
+                
+                degrad_patch_1, clean_patch_1 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
+                degrad_patch_2, clean_patch_2 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
 
             # change color space if necessary
             # if self.opt["color"]:
@@ -447,8 +450,8 @@ class MDDataset(data.Dataset):
             # return {"GT": img_GT, "LQ": img_LQ, "LQ_clip": lq4clip,  "type": deg_type, "GT_path": GT_path}
 
             
-            degrad_patch_1, clean_patch_1 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
-            degrad_patch_2, clean_patch_2 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
+            # degrad_patch_1, clean_patch_1 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
+            # degrad_patch_2, clean_patch_2 = random_augmentation(*self._crop_patch(img_LQ, img_GT))
             
             # img_GT = np.ascontiguousarray(np.transpose(img_GT, (2, 0, 1)))
             # img_LQ = np.ascontiguousarray(np.transpose(img_LQ, (2, 0, 1)))
@@ -458,14 +461,11 @@ class MDDataset(data.Dataset):
             degrad_patch_2 = clip_transform(degrad_patch_2)
             clean_patch_2 = clip_transform(clean_patch_2)
             
-            degrad_patch_1 = np.ascontiguousarray(degrad_patch_1)
-            clean_patch_1 = np.ascontiguousarray(clean_patch_1)
-            degrad_patch_2 = np.ascontiguousarray(degrad_patch_2)
-            clean_patch_2 = np.ascontiguousarray(clean_patch_2)
-            
-            clean_patch_1, clean_patch_2 = torch.from_numpy(clean_patch_1).float(), torch.from_numpy(clean_patch_2).float()
-            degrad_patch_1, degrad_patch_2 = torch.from_numpy(degrad_patch_1).float(), torch.from_numpy(degrad_patch_2).float()
-            
+            degrad_patch_1 = torch.from_numpy(np.ascontiguousarray(degrad_patch_1)).float()
+            clean_patch_1 = torch.from_numpy(np.ascontiguousarray(clean_patch_1)).float()
+            degrad_patch_2 = torch.from_numpy(np.ascontiguousarray(degrad_patch_2)).float()
+            clean_patch_2 = torch.from_numpy(np.ascontiguousarray(clean_patch_2)).float()
+                      
             # print("degrad_patch_1 shape: ", degrad_patch_1.shape)
             # print("clean_patch_1 shape: ", clean_patch_1.shape)     
             

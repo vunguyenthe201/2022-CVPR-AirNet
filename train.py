@@ -43,34 +43,29 @@ if __name__ == '__main__':
     print('Start training...')
     for epoch in range(opt.epochs):
         for ([clean_name, de_id], degrad_patch_1, degrad_patch_2, clean_patch_1, clean_patch_2) in tqdm(trainloader):
-            try:
-                if "error" in clean_name:
-                    print("Error in data loading, skipping this batch.")
-                    continue
-                
-                degrad_patch_1, degrad_patch_2 = degrad_patch_1.cuda(), degrad_patch_2.cuda()
-                clean_patch_1, clean_patch_2 = clean_patch_1.cuda(), clean_patch_2.cuda()
-
-                optimizer.zero_grad()
-
-                if epoch < opt.epochs_encoder:
-                    _, output, target, _ = net.E(x_query=degrad_patch_1, x_key=degrad_patch_2)
-                    contrast_loss = CE(output, target)
-                    loss = contrast_loss
-                else:
-                    restored, output, target = net(x_query=degrad_patch_1, x_key=degrad_patch_2)
-                    contrast_loss = CE(output, target)
-                    l1_loss = l1(restored, clean_patch_1)
-                    loss = l1_loss + 0.1 * contrast_loss
-
-                # backward
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-            except Exception as e:
-                print(f"Error during training: {e}")
-                optimizer.zero_grad()
+            if "error" in clean_name:
+                print("Error in data loading, skipping this batch.")
                 continue
+            
+            degrad_patch_1, degrad_patch_2 = degrad_patch_1.cuda(), degrad_patch_2.cuda()
+            clean_patch_1, clean_patch_2 = clean_patch_1.cuda(), clean_patch_2.cuda()
+
+            optimizer.zero_grad()
+
+            if epoch < opt.epochs_encoder:
+                _, output, target, _ = net.E(x_query=degrad_patch_1, x_key=degrad_patch_2)
+                contrast_loss = CE(output, target)
+                loss = contrast_loss
+            else:   
+                restored, output, target = net(x_query=degrad_patch_1, x_key=degrad_patch_2)
+                contrast_loss = CE(output, target)
+                l1_loss = l1(restored, clean_patch_1)
+                loss = l1_loss + 0.1 * contrast_loss
+
+            # backward
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
         if epoch < opt.epochs_encoder:
             print(

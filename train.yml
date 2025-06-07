@@ -3,7 +3,8 @@ name: universal-ir
 use_tb_logger: true
 model: denoising
 distortion: [blurry,hazy,jpeg-compressed,low-light,noisy,raindrop,snowy]
-gpu_ids: [5]
+# distortion: [gaussian-blurry,hazy,jpeg-compressed,low-light,motion-blurry,noisy,raindrop,snowy]
+gpu_ids: [0]
 
 sde:
   max_sigma: 50
