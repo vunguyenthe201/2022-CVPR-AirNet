@@ -535,7 +535,6 @@ class DerainDehazeDataset(Dataset):
     def __len__(self):
         return self.length
 
-
 class TestSpecificDataset(Dataset):
     def __init__(self, args):
         super(TestSpecificDataset, self).__init__()
@@ -546,21 +545,36 @@ class TestSpecificDataset(Dataset):
         self.toTensor = ToTensor()
 
     def _init_clean_ids(self, root):
-        name_list = os.listdir(root)
-        self.degraded_ids += [root + id_ for id_ in name_list]
+        extensions = ['jpg', 'JPG', 'png', 'PNG', 'jpeg', 'JPEG', 'bmp', 'BMP']
+        if os.path.isdir(root):
+            name_list = []
+            for image_file in os.listdir(root):
+                if any([image_file.endswith(ext) for ext in extensions]):
+                    name_list.append(image_file)
+            if len(name_list) == 0:
+                raise Exception('The input directory does not contain any image files')
+            self.degraded_ids += [root + id_ for id_ in name_list]
+        else:
+            if any([root.endswith(ext) for ext in extensions]):
+                name_list = [root]
+            else:
+                raise Exception('Please pass an Image file')
+            self.degraded_ids = name_list
+        print("Total Images : {}".format(name_list))
 
         self.num_img = len(self.degraded_ids)
 
     def __getitem__(self, idx):
         # degraded_img = crop_img(np.array(Image.open(self.degraded_ids[idx]).convert('RGB')), base=16)
         degraded_img = np.array(Image.open(self.degraded_ids[idx]).convert('RGB'))
+        original_shape = degraded_img.shape
+        degraded_img = crop_img(degraded_img, base=16)
         name = self.degraded_ids[idx].split('/')[-1][:-4]
 
         degraded_img = self.toTensor(degraded_img)
 
-        return [name], degraded_img
+        return [name], degraded_img, original_shape
 
     def __len__(self):
         return self.num_img
-
-
+    
